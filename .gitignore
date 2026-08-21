@@ -1,0 +1,34 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# 로그
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# 편집기
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.sw?
+
+# 원본 그림 51MB. 게임이 쓰는 것은 game/public/art/ 의 줄인 사본이고,
+# 원본은 다시 줄일 때만 쓴다. 저장소에 넣으면 받는 사람마다 51MB 를 끌어야 한다.
+#
+# public/ 바깥에 둔다. Vite 는 public/ 을 통째로 dist 로 복사하므로, 저 안에 두면
+# 쓰지도 않는 51MB 가 올라간다.
+assets-src/
+
+# .env 는 이미 저장소에 올라와 있다. 플랫폼이 VITE_AGENT8_VERSE 를 여기에 넣어
+# 관리하므로 지우지 않는다. 새로 만드는 것만 막는다.
+.env.*
+!.env.example
+
+# 공개 저장소에는 안 올린다
+.env

@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#d9cba8">
+<meta name="description" content="사라진 설계도. 남은 정면도와 측면도 두 장만 보고 건물을 다시 세우는 퍼즐">
+<title>남은 두 장</title>
+
+<!-- 아이콘과 미리보기. 경로를 상대로 두어야 Verse8 이 어느 경로에 얹든 따라간다. -->
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta property="og:type" content="website">
+<meta property="og:title" content="남은 두 장">
+<meta property="og:description" content="사라진 설계도. 남은 정면도와 측면도 두 장만 보고 건물을 다시 세우는 퍼즐">
+<meta property="og:image" content="./icon-512.png">
+<meta name="twitter:card" content="summary">
+
+<link rel="stylesheet" href="./src/ui/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── 타이틀 ────────────────────────────────────── -->
+  <section class="screen title" id="scr-title">
+    <!-- 견습이 쪽지 옆에 서 있는다. 이 사람이 곧 쓰는 사람이다. -->
+    <img class="title-figure" id="s-title-figure" alt="" hidden>
+    <div class="title-inner">
+      <h1>남은 두 장</h1>
+      <p class="sub" id="s-title-sub"></p>
+      <div class="menu">
+        <button class="act big" id="s-start" data-i18n="menu.start"></button>
+        <button class="act big" id="s-endless" data-i18n="menu.endless"></button>
+        <!-- 아래 둘은 Verse8 쪽이 붙었을 때만 나타난다. 안 붙었으면 있을 이유가 없다.
+             이름은 등수 창 안에서 적는다. 등수에 걸 이름이라 그 자리에서 보는 것이 맞다. -->
+        <button class="act" id="s-rank" data-i18n="menu.rank" hidden></button>
+        <button class="act" id="s-shop" data-i18n="menu.shop"></button>
+        <!-- 프리미엄. 하나뿐인 돈 쓰는 자리라 다른 단추와 확실히 갈라 둔다. -->
+        <button class="act premium" id="s-buy-adfree" hidden>
+          <span class="premium-name" data-i18n="menu.buyAdFree"></span>
+          <span class="premium-note" data-i18n="shop.premiumNote"></span>
+        </button>
+        <div class="row">
+          <button class="act" id="s-log" data-i18n="menu.log"></button>
+          <button class="act" id="s-title-rule" data-i18n="menu.rules"></button>
+          <button class="act" id="s-settings-open" data-i18n="menu.settings"></button>
+        </div>
+      </div>
+      <p class="cap" id="s-title-note"></p>
+      <button class="act tiny" id="s-hero-change" data-i18n="menu.heroChange"></button>
+    </div>
+  </section>
+
+  <!-- ── 판 고르기 ───────────────────────────────── -->
+  <section class="screen select" id="scr-select" hidden>
+    <header class="top">
+      <button class="act small" id="s-select-back" data-i18n="select.back"></button>
+      <span class="cap" id="s-select-note"></span>
+    </header>
+    <div class="job-list" id="s-stage-grid"></div>
+  </section>
+
+  <!-- ── 작업 ──────────────────────────────────────── -->
+  <section class="screen play" id="scr-play" hidden>
+
+    <header class="top">
+      <button class="act small" id="s-back"></button>
+      <span class="stage-name" id="s-stage-name"></span>
+      <button class="act small" id="s-play-sound"></button>
+      <button class="act small" id="s-help" data-i18n="play.rules" aria-expanded="false"></button>
+    </header>
+
+    <section class="plans">
+      <p class="cap" data-i18n="play.plansCap"></p>
+      <svg id="s-plans" role="img" data-i18n-aria="aria.plans"></svg>
+    </section>
+
+    <section class="stage">
+      <svg id="s-iso" role="application" data-i18n-aria="aria.site"></svg>
+      <!-- 끌어서 돌리는 줄 모르는 사람이 있다. 한 번에 한 모서리씩 도는 단추를 붙여 둔다. -->
+      <!-- 글자 ◀ ▶ 는 글꼴마다 좌우 여백이 달라 가운데가 안 맞는다. 삼각형을 직접 그린다. -->
+      <button class="act turn" id="s-rot-l" data-i18n-aria="aria.rotL">
+        <svg class="arrow" viewBox="0 0 12 12" aria-hidden="true"><polygon points="8.5,1.5 8.5,10.5 2.5,6"/></svg>
+      </button>
+      <button class="act turn" id="s-rot-r" data-i18n-aria="aria.rotR">
+        <svg class="arrow" viewBox="0 0 12 12" aria-hidden="true"><polygon points="3.5,1.5 3.5,10.5 9.5,6"/></svg>
+      </button>
+    </section>
+
+    <p class="status" id="s-status" aria-live="polite"></p>
+
+    <footer class="controls">
+      <!-- 층 고르개. 칸은 main.js 가 부지 크기(N)에 맞춰 채운다. -->
+      <div class="floors" id="s-floors" role="group" data-i18n-aria="aria.floors">
+        <span class="floors-label" data-i18n="play.floor"></span>
+        <div class="chips" id="s-floor-chips"></div>
+      </div>
+      <div class="btns">
+        <button class="act" id="s-undo"><i class="ico ico-undo"></i><span id="s-undo-count"></span></button>
+        <button class="act" id="s-reset"><i class="ico ico-reset"></i><span data-i18n="btn.reset"></span></button>
+        <button class="act" id="s-hintbtn"><i class="ico ico-hint"></i><span id="s-hint-count"></span></button>
+        <button class="act" id="s-view"><i class="ico ico-view"></i><span data-i18n="btn.view"></span></button>
+      </div>
+      <button class="act primary" id="s-submit" data-i18n="btn.submit"></button>
+    </footer>
+
+  </section>
+
+</div>
+
+<!-- 설정. 소리 크기와 말, 기록 지우기가 여기에 모인다. -->
+<div class="sheet" id="s-settings-sheet" hidden>
+  <div class="sheet-inner">
+    <h2 data-i18n="settings.title"></h2>
+
+    <p class="cap" data-i18n="settings.volume"></p>
+    <div class="set-row">
+      <input type="range" id="s-volume" min="0" max="100" value="70" step="5">
+      <span class="cap" id="s-volume-label"></span>
+    </div>
+
+    <p class="cap" data-i18n="settings.music"></p>
+    <div class="set-row">
+      <input type="range" id="s-music" min="0" max="100" value="40" step="5">
+      <span class="cap" id="s-music-label"></span>
+    </div>
+
+    <p class="cap" data-i18n="settings.language"></p>
+    <div class="lang-pick" id="s-lang-pick"></div>
+
+    <button class="act" id="s-wipe" data-i18n="settings.wipe"></button>
+    <button class="act" id="s-settings-close" data-i18n="settings.close"></button>
+  </div>
+</div>
+
+<!-- 복원공 고르개. 처음 시작할 때 한 번 뜨고, 나중에는 타이틀에서 다시 열 수 있다. -->
+<div class="sheet" id="s-hero" hidden>
+  <div class="sheet-inner center">
+    <h2 data-i18n="hero.title"></h2>
+    <p data-i18n="hero.body"></p>
+    <div class="hero-pick">
+      <button class="act hero-card" data-hero="m">
+        <img src="./art/apprentice-m.webp" alt="" onerror="this.hidden=true">
+        <span data-i18n="hero.m"></span>
+      </button>
+      <button class="act hero-card" data-hero="f">
+        <img src="./art/apprentice-f.webp" alt="" onerror="this.hidden=true">
+        <span data-i18n="hero.f"></span>
+        <span class="hero-lock" data-i18n="hero.lockTag" hidden></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 대화 ─────────────────────────────────────────── -->
+<div class="talk" id="s-talk" hidden>
+  <div class="talk-inner">
+    <img class="talk-face" id="s-talk-face" alt="" hidden>
+    <div class="talk-body-wrap">
+      <div class="talk-body">
+        <p class="talk-who" id="s-talk-who"></p>
+        <p class="talk-text" id="s-talk-text"></p>
+        <p class="talk-hint" id="s-talk-hint"></p>
+      </div>
+      <button class="act tiny talk-skip" id="s-talk-skip"></button>
+    </div>
+  </div>
+</div>
+
+<!-- 규칙은 평소 접어 둔다. 세로 화면에서 이 글이 펼쳐져 있으면 정작 도면이 안 보인다. -->
+<div class="sheet" id="s-rule" hidden>
+  <div class="sheet-inner">
+    <h2 data-i18n="rules.title"></h2>
+
+    <!-- 자재 하나가 도면 두 장에 한 칸씩. 이 그림 한 장이 규칙의 전부다. -->
+    <svg class="rule-fig" viewBox="0 0 300 118" role="img" data-i18n-aria="rules.fig">
+      <g stroke="#8a7a58" fill="#cdbb96">
+        <rect x="8" y="24" width="20" height="20"/><rect x="28" y="24" width="20" height="20"/>
+        <rect x="8" y="44" width="20" height="20"/><rect x="28" y="44" width="20" height="20"/>
+      </g>
+      <rect x="8" y="44" width="20" height="20" fill="#5a3d18" stroke="#8a7a58"/>
+      <text id="s-fig-front" x="28" y="16" fill="#5a3d18" font-size="11" font-family="monospace" text-anchor="middle"></text>
+
+      <g stroke="#8a7a58" fill="#cdbb96">
+        <rect x="252" y="24" width="20" height="20"/><rect x="272" y="24" width="20" height="20"/>
+        <rect x="252" y="44" width="20" height="20"/><rect x="272" y="44" width="20" height="20"/>
+      </g>
+      <rect x="272" y="44" width="20" height="20" fill="#5a3d18" stroke="#8a7a58"/>
+      <text id="s-fig-side" x="272" y="16" fill="#5a3d18" font-size="11" font-family="monospace" text-anchor="middle"></text>
+
+      <g stroke="#3a2c18" stroke-width="1.5" stroke-linejoin="round">
+        <polygon points="150,26 174,40 150,54 126,40" fill="#c9a267"/>
+        <polygon points="126,40 150,54 150,82 126,68" fill="#916d3d"/>
+        <polygon points="174,40 150,54 150,82 174,68" fill="#735730"/>
+      </g>
+      <path d="M120 54 L58 54" stroke="#8a6a3a" stroke-width="1.5" marker-end="url(#rule-tip)"/>
+      <path d="M180 54 L242 54" stroke="#8a6a3a" stroke-width="1.5" marker-end="url(#rule-tip)"/>
+      <defs>
+        <marker id="rule-tip" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" fill="#8a6a3a"/>
+        </marker>
+      </defs>
+      <text id="s-fig-cap" x="150" y="106" fill="#7b6a4c" font-size="11" font-family="monospace" text-anchor="middle"></text>
+    </svg>
+
+    <ul class="rule-list">
+      <li data-i18n-html="rules.1"></li>
+      <li data-i18n-html="rules.2"></li>
+      <li data-i18n-html="rules.3"></li>
+      <li data-i18n-html="rules.4"></li>
+      <li data-i18n-html="rules.5"></li>
+    </ul>
+
+    <p class="rule-legend">
+      <span><i class="sw" style="background:#5a3d18"></i><span data-i18n="rules.legendOk"></span></span>
+      <span><i class="sw dash"></i><span data-i18n="rules.legendPending"></span></span>
+      <span><i class="sw" style="background:#a33a2c"></i><span data-i18n="rules.legendWrong"></span></span>
+    </p>
+    <p class="rule-grade" data-i18n-html="rules.grade"></p>
+
+    <button class="act" id="s-rule-close" data-i18n="rules.close"></button>
+  </div>
+</div>
+
+<!-- 판을 맺을 때 뜨는 창. 안쪽 내용은 그때그때 채워 넣는다. -->
+<div class="sheet" id="s-clear" hidden>
+  <div class="sheet-inner center">
+    <img class="clear-art" id="s-clear-art" alt="" hidden>
+    <img class="clear-icon" id="s-clear-icon" alt="" hidden>
+    <h2 id="s-clear-title"></h2>
+    <img class="seal" id="s-clear-seal" alt="" hidden>
+    <p class="grade" id="s-clear-stars"></p>
+    <div class="quote" id="s-clear-quote" hidden>
+      <img class="quote-face" id="s-clear-face" alt="" hidden>
+      <p id="s-clear-quote-text"></p>
+    </div>
+    <div class="quote reply" id="s-clear-reply" hidden>
+      <p id="s-clear-reply-text"></p>
+      <img class="quote-face" id="s-clear-reply-face" alt="" hidden>
+    </div>
+    <p id="s-clear-body"></p>
+    <!-- 등수 창에서 이름을 적을 때만 나온다. -->
+    <div class="row" id="s-clear-input-row" hidden>
+      <label class="cap" for="s-clear-input" id="s-clear-input-label"></label>
+      <input id="s-clear-input" type="text" maxlength="15" autocomplete="off">
+    </div>
+    <!-- 가게 칸. 살 것 하나에 한 칸씩. 값과 지금 가진 수를 함께 적는다. -->
+    <div class="buys" id="s-clear-buys" hidden></div>
+    <ol class="rank-list" id="s-clear-list" hidden></ol>
+    <div class="menu" id="s-clear-actions"></div>
+  </div>
+</div>
+
+<!-- Verse8. 있으면 붙고 없으면 게임만 돈다. platform/boot.js 가 잡아 넘긴다. -->
+<script src="https://unpkg.com/@verse8/ads@0.5.0/dist/index.global.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@verse8/platform/dist/index.global.js" crossorigin="anonymous"></script>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

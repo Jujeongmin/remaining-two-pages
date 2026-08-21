@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>두 그림자</title>
+<style>
+:root{
+  --bg:#2a1c16; --panel:#3a2820; --panel2:#463027;
+  --wood:#c58a32; --gold:#e8b53c; --hi:#ffe9a8;
+  --ink:#eee8d4; --dim:#9d8a72;
+  --bad:#c95268; --good:#91b83d;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Courier New',ui-monospace,monospace; font-size:14px; line-height:1.5;
+  padding:18px 14px 60px;
+}
+h1{font-size:20px; letter-spacing:3px; color:var(--gold); margin:0 0 2px}
+.sub{color:var(--dim); font-size:12px; margin:0 0 16px}
+.bar{display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:10px 0}
+button.act{
+  background:var(--panel2); color:var(--ink); border:2px solid #000; padding:6px 12px;
+  cursor:pointer; font:inherit;
+}
+button.act:hover{background:var(--wood); color:#2a1c16}
+.rule{
+  background:var(--panel); border-left:3px solid var(--wood); padding:10px 12px;
+  margin:0 0 12px; font-size:12px; color:#d8c8ae; white-space:pre-line; max-width:760px;
+}
+.status{margin:12px 0; font-size:14px}
+.status.win{color:var(--good); font-weight:bold}
+.status.bad{color:var(--dim)}
+.panels{display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start}
+.cap{font-size:11px; color:var(--dim); letter-spacing:1px; margin:0 0 6px}
+svg{display:block; shape-rendering:crispEdges}
+/* 끌어서 돌릴 때 옆의 글자가 딸려 선택되지 않게 한다. */
+#s-iso{user-select:none; -webkit-user-select:none}
+/* 빈 자리 표시. 작고 옅게 두어 뒤쪽 블록을 가리지 않고, 손을 얹으면 또렷해진다. */
+.ghost{opacity:.3; cursor:pointer}
+.ghost:hover{opacity:1}
+.cube{cursor:pointer}
+.cube:hover polygon{stroke:var(--hi); stroke-width:2}
+.budget{color:var(--gold); font-weight:bold}
+</style>
+</head>
+<body>
+
+<h1>두 그림자</h1>
+<p class="sub">앞에서 본 그림자와 옆에서 본 그림자를 한꺼번에 맞추는 퍼즐</p>
+
+<p class="rule">블록 덩어리를 <b>앞에서</b> 비추면 그림자 한 장이, <b>옆에서</b> 비추면 다른 한 장이 생긴다.
+두 그림자가 <b>동시에</b> 도면과 같아지게 블록을 놓아라. 블록은 정해진 개수만 쓸 수 있다.
+
+그림자는 정보를 버린다. 앞 그림자만 보면 그 칸이 얼마나 깊은지 알 수 없고, 옆 그림자만 보면 좌우를 알 수 없다.
+두 장을 겹쳐 세워야 자리가 하나로 정해진다.
+
+빈 터에 뜬 <b>작은 상자</b>가 놓을 수 있는 자리다. 누르면 블록이 서고, 선 블록을 다시 누르면 빠진다.
+빈 터를 <b>끌면 돌아간다</b>. 돌려도 손이 안 닿는 가운데 자리는 <b>앞쪽 층 젖히기</b>로 앞에서부터 걷어낸다.
+
+<span style="color:var(--gold)">금색 점선</span>은 아직 못 채운 칸, <span style="color:var(--gold)">금색</span>은 채운 칸, <span style="color:var(--bad)">빨강</span>은 도면에 없는데 튀어나온 칸이다.</p>
+
+<div class="bar">
+  <span>판</span><span id="s-levels"></span>
+  <button class="act" id="s-gen">새 판</button>
+  <span class="cap" id="s-info" style="margin:0"></span>
+</div>
+<div class="bar">
+  <button class="act" id="s-undo">되돌리기</button>
+  <button class="act" id="s-reset">처음부터</button>
+  <button class="act" id="s-solve">정답 보기</button>
+  <button class="act" id="s-view">시점 되돌리기</button>
+</div>
+<div class="bar">
+  <label for="s-peel">앞쪽 층 젖히기</label>
+  <input type="range" id="s-peel" min="0" max="3" value="0" step="1" style="accent-color:var(--gold)">
+  <span class="cap" id="s-peel-label" style="margin:0"></span>
+</div>
+
+<div class="panels">
+  <div><p class="cap">맞춰야 할 그림자 두 장</p><svg id="s-plans"></svg></div>
+  <div><p class="cap">빈 터 — 끌면 돌아간다</p><svg id="s-iso"></svg></div>
+</div>
+<p class="status" id="s-status"></p>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const N = 4;
+
+/*
+ * 판 정의. keep 은 [x, y, d] 로 "여기에 블록이 있다" 를 적은 것이다.
+ * 그림자 두 장과 쓸 수 있는 블록 개수는 전부 이 목록에서 계산한다. 정답에서 거꾸로
+ * 만들기 때문에 안 풀리는 판이 나올 수 없다.
+ *
+ * 한 줄(y) 안에서는 x 도 d 도 겹치지 않게 적는다. 그래야 블록 하나가 앞 그림자 한 칸과
+ * 옆 그림자 한 칸을 낭비 없이 하나씩 먹어서, 주어진 개수가 곧 최소 개수가 된다.
+ * 겹치게 적으면 그림자가 헐거워져 아무렇게나 놓아도 풀리는 싱거운 판이 된다.
+ */
+const LEVELS = [
+  { keep: [[0, 3, 0], [1, 3, 1], [2, 3, 2], [3, 3, 3], [1, 1, 1], [2, 1, 2]] },
+  { keep: [[0, 0, 0], [3, 0, 3], [0, 3, 3], [3, 3, 0], [1, 2, 1], [2, 1, 2]] },
+  { keep: [[1, 0, 2], [2, 0, 1], [0, 2, 0], [3, 2, 3], [1, 3, 1], [2, 3, 2], [0, 1, 3]] },
+  { keep: [[1, 0, 0], [2, 0, 1], [0, 1, 2], [3, 1, 3], [0, 2, 1], [3, 2, 2], [1, 3, 3], [2, 3, 0]] },
+  { keep: [[0, 0, 0], [1, 0, 1], [2, 0, 2], [3, 0, 3], [1, 1, 2], [2, 1, 1], [0, 2, 3], [3, 2, 0], [1, 3, 0], [2, 3, 3]] },
+];
+
+/* 지금 푸는 판. 고정 판이든 뽑은 판이든 keep 한 벌로만 들고 있는다. */
+const state = { keep: null, info: '', blocks: null, history: [] };
+
+/* ── 판 상태 ─────────────────────────────────────────────── */
+function empty() {
+  const a = [];
+  for (let d = 0; d < N; d++) { a[d] = []; for (let y = 0; y < N; y++) { a[d][y] = []; for (let x = 0; x < N; x++) a[d][y][x] = false; } }
+  return a;
+}
+function clone(a) { return a.map((L) => L.map((r) => r.slice())); }
+function fromKeep(keep) { const a = empty(); keep.forEach(([x, y, d]) => a[d][y][x] = true); return a; }
+
+/** 앞에서 본 그림자. 깊이가 뭉개지므로 한 칸이라도 차 있으면 채워진 것으로 보인다. */
+function front(a) { const g = []; for (let y = 0; y < N; y++) { g[y] = []; for (let x = 0; x < N; x++) g[y][x] = a.some((L) => L[y][x]); } return g; }
+/** 옆에서 본 그림자. 이번엔 x 가 뭉개지고 가로축이 깊이로 바뀐다. */
+function side(a) { const g = []; for (let y = 0; y < N; y++) { g[y] = []; for (let d = 0; d < N; d++) g[y][d] = a[d][y].some(Boolean); } return g; }
+function count(a) { let n = 0; a.forEach((L) => L.forEach((r) => r.forEach((c) => { if (c) n++; }))); return n; }
+function sameGrid(a, b) { return a.every((r, y) => r.every((c, x) => c === b[y][x])); }
+
+/* ── 판 뽑기 ─────────────────────────────────────────────
+ * 손으로 적을 때와 규칙이 똑같다. 한 줄 안에서 x 도 d 도 겹치면 안 된다.
+ * 줄마다 x 를 k 개, d 를 k 개 골라 무작위로 짝지으면 그 줄은 저절로 조건을 만족한다.
+ * 줄끼리는 아무 상관이 없으므로 줄별로 따로 뽑아 합치면 그것으로 끝이다.
+ * 되물리거나 다시 뽑을 일이 없어서, 실패하는 경우가 아예 없다.
+ */
+function rngOf(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/** 앞에서 k 개만 쓸 것이므로 끝까지 섞지 않고 k 번만 섞는다. */
+function pick(rng, arr, k) {
+  const a = arr.slice();
+  for (let i = 0; i < k; i++) {
+    const j = i + Math.floor(rng() * (a.length - i));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, k);
+}
+/** 블록 total 개를 줄마다 몇 개씩 놓을지 정한다. */
+function spread(rng, total) {
+  const k = new Array(N).fill(Math.floor(total / N));
+  pick(rng, [...Array(N).keys()], total % N).forEach((y) => k[y]++);
+  // 고르게만 나누면 뽑을 때마다 판이 비슷해진다. 줄 사이에서 한 개씩 옮겨 굴곡을 준다.
+  // 한 줄에 N 개가 다 차면 그 줄은 그림자가 꽉 차 아무 자리나 맞는다. 그래서 N-1 에서 막는다.
+  for (let t = 0; t < N * 3; t++) {
+    const a = Math.floor(rng() * N), b = Math.floor(rng() * N);
+    if (a !== b && k[a] > 0 && k[b] < N - 1) { k[a]--; k[b]++; }
+  }
+  return k;
+}
+function genKeep(seed, total) {
+  const rng = rngOf(seed), keep = [];
+  spread(rng, total).forEach((k, y) => {
+    const xs = pick(rng, [...Array(N).keys()], k);
+    const ds = pick(rng, [...Array(N).keys()], k);
+    xs.forEach((x, i) => keep.push([x, y, ds[i]]));
+  });
+  return keep;
+}
+
+/* 그림자 한 칸의 색. lit 은 지금 모양, want 는 도면. 점선은 "아직 못 채웠다" 는 뜻이다. */
+function cellStyle(lit, want) {
+  if (lit && want) return { fill: 'var(--gold)', dash: false };
+  if (lit && !want) return { fill: 'var(--bad)', dash: false };
+  if (want) return { fill: '#3a2a18', dash: true };
+  return { fill: '#241812', dash: false };
+}
+
+/* ── 3차원 화면 ──────────────────────────────────────────────
+ * 격자 좌표 (x, 깊이, 높이) 를 카메라로 돌려 화면에 옮긴다. 끌면 yaw(좌우)와
+ * pitch(위아래)가 바뀐다. 원근은 넣지 않는다. 칸이 같은 크기로 보여야 세기 편하다.
+ *
+ * 축에 나란한 정육면체만 놓이므로, 칸 한가운데의 카메라 거리로 정렬해 먼 것부터
+ * 칠하면 가림이 정확히 맞는다. 그려 넣는 순서가 곧 클릭 순서이기도 해서, 눈에 보이는
+ * 것이 눌린다. 면은 바깥을 향한 것만 남기고 뒤쪽을 향한 면은 버린다.
+ */
+const CAM0 = { yaw: Math.PI / 4, pitch: 0.62 };  // 처음 시점. 되돌릴 때 여기로 온다.
+const cam = { yaw: CAM0.yaw, pitch: CAM0.pitch, S: 58 };  // S 는 칸 한 변의 화면 크기
+let TRIG = null;
+function setCam() {
+  TRIG = { cy: Math.cos(cam.yaw), sy: Math.sin(cam.yaw), cp: Math.cos(cam.pitch), sp: Math.sin(cam.pitch) };
+}
+const hOf = (y) => N - 1 - y;
+
+/** 격자 좌표 하나를 화면 좌표와 카메라 거리로 옮긴다. 판 한가운데가 원점이다. */
+function project(gx, gd, gz) {
+  const cx = gx - N / 2, cd = gd - N / 2, cz = gz - N / 2;
+  const rx = cx * TRIG.cy - cd * TRIG.sy, rd = cx * TRIG.sy + cd * TRIG.cy;
+  return {
+    sx: rx * cam.S,
+    sy: (-rd * TRIG.sp - cz * TRIG.cp) * cam.S,
+    depth: rd * TRIG.cp - cz * TRIG.sp,
+  };
+}
+const ptsOf = (ps) => ps.map((p) => `${p.sx.toFixed(1)},${p.sy.toFixed(1)}`).join(' ');
+
+/* 정육면체 여섯 면. 꼭짓점은 바깥에서 볼 때 한 방향으로 돌게 적었다. 그래서 화면에
+ * 옮긴 뒤 넓이의 부호만 보면 이 면이 우리 쪽인지 반대쪽인지 알 수 있다.
+ * shade 는 밝기 단계로, 면 방향마다 달라야 모서리가 눈에 잡힌다. */
+const FACES = [
+  { v: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], shade: 0 },
+  { v: [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]], shade: 3 },
+  { v: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], shade: 1 },
+  { v: [[1, 1, 0], [0, 1, 0], [0, 1, 1], [1, 1, 1]], shade: 2 },
+  { v: [[0, 1, 0], [0, 0, 0], [0, 0, 1], [0, 1, 1]], shade: 2 },
+  { v: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]], shade: 1 },
+];
+function cubeSVG(ox, od, oz, size, shades) {
+  let out = '';
+  for (const f of FACES) {
+    const ps = f.v.map(([a, b, c]) => project(ox + a * size, od + b * size, oz + c * size));
+    let area = 0;
+    for (let i = 0; i < 4; i++) { const p = ps[i], q = ps[(i + 1) % 4]; area += p.sx * q.sy - q.sx * p.sy; }
+    if (area >= 0) continue;  // 반대쪽을 향한 면. 그려 봐야 앞면에 덮인다.
+    out += `<polygon points="${ptsOf(ps)}" fill="${shades[f.shade]}" stroke="#2a1c10" stroke-width="1"/>`;
+  }
+  return out;
+}
+
+const SOLID = ['#c9924a', '#a1733a', '#7d5a2c', '#5c4020'];
+const EMPTY = ['#a8926c', '#8a7658', '#6a5a44', '#4c4034'];
+
+function drawScene(a, peel, canPlace, onPick) {
+  const parts = [];
+
+  // 바닥 격자. 돌리고 나서도 어디가 어느 쪽인지 잡아 주는 것은 이것뿐이다.
+  for (let i = 0; i <= N; i++) {
+    const a1 = project(i, 0, 0), a2 = project(i, N, 0);
+    const b1 = project(0, i, 0), b2 = project(N, i, 0);
+    parts.push(`<line x1="${a1.sx.toFixed(1)}" y1="${a1.sy.toFixed(1)}" x2="${a2.sx.toFixed(1)}" y2="${a2.sy.toFixed(1)}" stroke="#4a3524"/>`);
+    parts.push(`<line x1="${b1.sx.toFixed(1)}" y1="${b1.sy.toFixed(1)}" x2="${b2.sx.toFixed(1)}" y2="${b2.sy.toFixed(1)}" stroke="#4a3524"/>`);
+  }
+  // 그림자를 어느 쪽에서 본 것인지 바닥 가장자리에 적어 둔다. 돌리면 글자도 같이 돈다.
+  const mark = (gx, gd, text) => {
+    const p = project(gx, gd, 0);
+    parts.push(`<text x="${p.sx.toFixed(1)}" y="${p.sy.toFixed(1)}" fill="#9d8a72" font-size="12"`
+      + ` font-family="monospace" text-anchor="middle">${text}</text>`);
+  };
+  mark(N / 2, -0.9, '앞 그림자 쪽');
+  mark(-1.2, N / 2, '옆 그림자 쪽');
+
+  /* 놓인 블록과 빈 자리를 한 목록에 담는다. 빈 자리는 칸 한가운데에 작게 그려서 뒤쪽
+   * 블록을 덮지 않는다. 블록을 다 쓰면 빈 자리를 아예 그리지 않아, 이제 뺄 수밖에
+   * 없다는 것이 눈으로 바로 보인다. */
+  const cells = [];
+  for (let d = peel; d < N; d++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const solid = a[d][y][x];
+    if (!solid && !canPlace) continue;
+    const z = hOf(y);
+    cells.push({ x, y, d, z, solid, depth: project(x + 0.5, d + 0.5, z + 0.5).depth });
+  }
+  cells.sort((p, q) => q.depth - p.depth);  // 먼 것부터 칠한다
+
+  const GH = 0.34;  // 빈 자리 상자의 한 변. 칸 한가운데에 이만큼만 그린다.
+  for (const c of cells) {
+    const size = c.solid ? 1 : GH, off = c.solid ? 0 : (1 - GH) / 2;
+    parts.push(
+      `<g class="${c.solid ? 'cube' : 'ghost'}" data-d="${c.d}" data-y="${c.y}" data-x="${c.x}" data-solid="${c.solid ? 1 : 0}">`
+      + cubeSVG(c.x + off, c.d + off, c.z + off, size, c.solid ? SOLID : EMPTY)
+      + '</g>',
+    );
+  }
+
+  // 돌려도 판이 출렁이지 않도록 보이는 범위를 고정해 둔다.
+  const R = cam.S * (N + 2.4) / 2;
+  const svg = $('#s-iso');
+  svg.setAttribute('viewBox', `${-R} ${-R} ${2 * R} ${2 * R}`);
+  svg.setAttribute('width', Math.round(2 * R));
+  svg.setAttribute('height', Math.round(2 * R));
+  svg.innerHTML = parts.join('');
+  svg.querySelectorAll('.cube, .ghost').forEach((g) => {
+    g.onclick = () => {
+      if (turned) return;  // 돌리려고 끈 것이지 누른 것이 아니다
+      onPick(+g.dataset.d, +g.dataset.y, +g.dataset.x, g.dataset.solid === '1');
+    };
+  });
+}
+
+/* ── 끌어서 돌리기 ────────────────────────────────────────────
+ * 끄는 도중에도 다시 그려야 따라 도는 느낌이 난다. 끌고 나서 손을 떼면 클릭도 같이
+ * 일어나므로, 얼마나 움직였는지 재 두었다가 조금이라도 돌렸으면 클릭을 무시한다.
+ */
+let drag = null, turned = false;
+(function rotator() {
+  const svg = $('#s-iso');
+  svg.style.touchAction = 'none';
+  svg.style.cursor = 'grab';
+  svg.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch, moved: 0 };
+    turned = false;
+    svg.setPointerCapture(e.pointerId);
+    svg.style.cursor = 'grabbing';
+  });
+  svg.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
+    if (drag.moved > 4) turned = true;
+    cam.yaw = drag.yaw + dx * 0.012;
+    // 너무 눕히면 바닥 격자가 선으로 뭉개져 방향을 잃고, 뒤집으면 밑에서 올려다보게 된다.
+    cam.pitch = Math.min(1.45, Math.max(0.25, drag.pitch + dy * 0.012));
+    draw();
+  });
+  const done = () => { drag = null; svg.style.cursor = 'grab'; };
+  svg.addEventListener('pointerup', done);
+  svg.addEventListener('pointercancel', done);
+})();
+
+/* ── 그림자 두 장 ─────────────────────────────────────────────
+ * 기울이지 않은 격자로 그린다. 블록을 아무리 쌓아도 이쪽은 가려지지 않으므로,
+ * 그림자만 보고 모양을 궁리할 수 있다.
+ */
+function drawPlans(cur, tFront, tSide) {
+  const C = 34, GAP = 34, TOP = 16, FOOT = 16;
+  const parts = [];
+
+  const sheet = (ox, title, foot, now, want) => {
+    parts.push(`<text x="${ox}" y="11" fill="var(--gold)" font-size="12" font-family="monospace">${title}</text>`);
+    for (let y = 0; y < N; y++) for (let i = 0; i < N; i++) {
+      const s = cellStyle(now[y][i], want[y][i]);
+      const px = ox + i * C, py = TOP + y * C;
+      parts.push(`<rect x="${px}" y="${py}" width="${C}" height="${C}" fill="${s.fill}" stroke="#1a1008"/>`);
+      if (s.dash) {
+        parts.push(`<rect x="${px + 2}" y="${py + 2}" width="${C - 4}" height="${C - 4}" fill="none"`
+          + ` stroke="var(--gold)" stroke-width="2" stroke-dasharray="5 4"/>`);
+      }
+    }
+    parts.push(`<text x="${ox}" y="${TOP + N * C + 12}" fill="#9d8a72" font-size="11" font-family="monospace">${foot}</text>`);
+  };
+
+  sheet(0, '앞 그림자', '가로 = 왼쪽 → 오른쪽', cur.front, tFront);
+  sheet(N * C + GAP, '옆 그림자', '가로 = 앞 → 뒤', cur.side, tSide);
+
+  const svg = $('#s-plans');
+  svg.setAttribute('width', 2 * N * C + GAP);
+  svg.setAttribute('height', TOP + N * C + FOOT);
+  svg.innerHTML = parts.join('');
+}
+
+/* ── 그리기 ─────────────────────────────────────────────── */
+function draw() {
+  const goal = fromKeep(state.keep);
+  const tFront = front(goal), tSide = side(goal), budget = count(goal);
+  $('#s-info').textContent = state.info;
+  const a = state.blocks;
+  const spent = count(a);
+
+  const cur = { front: front(a), side: side(a) };
+  drawPlans(cur, tFront, tSide);
+
+  setCam();
+  const peel = Number($('#s-peel').value);
+  $('#s-peel-label').textContent = peel === 0 ? '전부 보임' : `앞 ${peel}층 숨김`;
+  // 블록은 정해진 개수뿐이다. 다 쓰고 나면 먼저 빼야 다시 놓을 수 있다.
+  drawScene(a, peel, spent < budget, (d, y, x, solid) => {
+    state.history.push(clone(a));
+    state.blocks[d][y][x] = !solid;
+    draw();
+  });
+
+  const okFront = sameGrid(cur.front, tFront);
+  const okSide = sameGrid(cur.side, tSide);
+  const st = $('#s-status');
+  if (okFront && okSide && spent === budget) {
+    st.textContent = `완성. 블록 ${budget}개로 그림자 두 장을 모두 맞췄다.`;
+    st.className = 'status win';
+  } else {
+    st.innerHTML = `블록 <span class="budget">${spent} / ${budget}</span>`
+      + (okFront ? ' · 앞 그림자 ○' : ' · 앞 그림자 ✗')
+      + (okSide ? ' · 옆 그림자 ○' : ' · 옆 그림자 ✗');
+    st.className = 'status bad';
+  }
+}
+
+/* ── 조작 ─────────────────────────────────────────────── */
+function load(keep, info) {
+  state.keep = keep;
+  state.info = info;
+  state.blocks = empty();
+  state.history = [];
+  draw();
+}
+$('#s-peel').max = N - 1;
+$('#s-peel').oninput = () => draw();
+$('#s-undo').onclick = () => { if (state.history.length) { state.blocks = state.history.pop(); draw(); } };
+$('#s-reset').onclick = () => { state.blocks = empty(); state.history = []; draw(); };
+$('#s-view').onclick = () => { cam.yaw = CAM0.yaw; cam.pitch = CAM0.pitch; draw(); };
+$('#s-solve').onclick = () => {
+  state.history.push(clone(state.blocks));
+  state.blocks = fromKeep(state.keep);
+  draw();
+};
+
+/* 판 고르개. 뽑은 판으로 넘어가면 어느 것도 켜지지 않게 -1 을 넘긴다. */
+const levelBtns = [];
+function markLevel(i) {
+  levelBtns.forEach((b, j) => {
+    b.style.background = j === i ? 'var(--gold)' : '';
+    b.style.color = j === i ? '#2a1c16' : '';
+  });
+}
+LEVELS.forEach((lv, i) => {
+  const b = document.createElement('button');
+  b.className = 'act';
+  b.textContent = `${i + 1} (${lv.keep.length})`;
+  b.onclick = () => { markLevel(i); load(lv.keep, `${i + 1}판`); };
+  $('#s-levels').appendChild(b);
+  levelBtns.push(b);
+});
+
+$('#s-gen').onclick = () => {
+  markLevel(-1);
+  const total = 7 + Math.floor(Math.random() * 3);  // 8 안팎이 사람이 풀기 좋다
+  load(genKeep(Math.floor(Math.random() * 1e9), total), `뽑은 판 (블록 ${total})`);
+};
+
+levelBtns[0].click();
+</script>
+</body>
+</html>

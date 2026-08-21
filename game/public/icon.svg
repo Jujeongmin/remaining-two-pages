@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 작게 줄여도 읽히도록 덩어리 셋만 둔다. 남은 도면 두 장과, 그 둘로 세운 부재 하나. -->
+  <rect width="64" height="64" fill="#d9cba8"/>
+
+  <!-- 측면도 (왼쪽 위) -->
+  <rect x="6" y="15" width="15" height="15" fill="#cdbb96" stroke="#3a2c18" stroke-width="1.5"/>
+  <rect x="9" y="18" width="4.5" height="4.5" fill="#3a2c18"/>
+  <rect x="13.5" y="22.5" width="4.5" height="4.5" fill="#3a2c18"/>
+
+  <!-- 정면도 (왼쪽 아래) -->
+  <rect x="13" y="42" width="15" height="15" fill="#cdbb96" stroke="#3a2c18" stroke-width="1.5"/>
+  <rect x="16" y="45" width="4.5" height="4.5" fill="#3a2c18"/>
+  <rect x="20.5" y="49.5" width="4.5" height="4.5" fill="#3a2c18"/>
+
+  <!-- 세운 부재. 면마다 밝기를 달리해야 모서리가 잡힌다. -->
+  <g stroke="#3a2c18" stroke-width="1.8" stroke-linejoin="round">
+    <polygon points="40,13 56,22 56,40 40,49 24,40 24,22" fill="#a87f45"/>
+    <polygon points="40,13 56,22 40,31 24,22" fill="#c39a5c"/>
+    <polygon points="40,31 56,22 56,40 40,49" fill="#6d502a"/>
+    <polygon points="40,31 24,22 24,40 40,49" fill="#8a6636"/>
+  </g>
+</svg>
